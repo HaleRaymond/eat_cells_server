@@ -1,19 +1,19 @@
 // Eat Cell / Agar.io-style multiplayer server
-// Node.js + ws
+// Node.js + ws with HTTPS/WSS support
 
 const WebSocket = require("ws");
 
 /* ---------------- CONFIG ---------------- */
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8080;  // Changed to standard HTTPS/WSS port
 const TICK_RATE = 10;                 // ticks per second
 const WORLD_SIZE = 6000;              // square world, center (0,0)
 const BASE_SPEED = 550;               // base movement speed
-const SPLIT_SPEED = 400;             // speed of split pieces
+const SPLIT_SPEED = 400;              // speed of split pieces
 const MERGE_TIME = 10;                // seconds before cells can merge
 const FOOD_COUNT = 120;
 const FOOD_RADIUS = 15;
-const VIRUS_COUNT = 12;
+const VIRUS_COUNT = 20;
 const VIRUS_RADIUS = 60;
 const MAX_VIRUS_PIECES = 16;
 const BOT_COUNT = 20;                 // how many bots to spawn
@@ -337,8 +337,6 @@ function handleMessage(ws, raw) {
   if (!id) return;
   const player = players.get(id);
   if (!player) return;
-  
-
 
   switch (msg.type) {
     case "join":
@@ -351,30 +349,19 @@ function handleMessage(ws, raw) {
       if (typeof msg.color === "object") {
         player.color = msg.color;
       }
-      // we don't need a separate init message; state broadcast will include them
       break;
 
     case "input":
- //     if (Array.isArray(msg.dir) && msg.dir.length === 2) {
- //       player.inputDir = msg.dir.map((v) => Number(v) || 0);
- //     }
-
-
       if (Array.isArray(msg.dir) && msg.dir.length === 2) {
         player.inputDir = msg.dir.map((v) => Number(v) || 0);
         
         // Check if this is a mouse position (when dir points to actual position)
-        // We assume if the direction vector length is > 1, it's actually a mouse position
         const dirLen = Math.sqrt(player.inputDir[0] ** 2 + player.inputDir[1] ** 2);
         
         if (dirLen > 0) {
           // This could be a mouse position relative to cell center
-          // We'll calculate the absolute mouse position
           if (player.cells.length > 0) {
-            // Get the first cell as reference point
             const firstCell = player.cells[0];
-            // The dir array contains direction to mouse, but for precise movement
-            // we need to interpret it as target position
             const mouseDistance = 100; // Default distance for mouse position
             
             player.mouseX = firstCell.x + player.inputDir[0] * mouseDistance;
@@ -383,7 +370,6 @@ function handleMessage(ws, raw) {
           }
         }
       }
-
       break;
 
     case "split":
@@ -400,7 +386,6 @@ function handleMessage(ws, raw) {
 }
 
 /* ---------------- GAME LOGIC ---------------- */
-
 
 function splitPlayer(player) {
   const dir = player.inputDir;
@@ -438,7 +423,6 @@ function splitPlayer(player) {
     player.cells.push(...newCells);
   }
 }
-
 
 function ejectMass(player) {
   const dir = player.inputDir;
@@ -488,7 +472,7 @@ function explodeCellIntoMany(player, cell) {
     const speed = 200;
     
     // Position cells in a circle with minimum distance
-    const distance = minDistance * (0.8 + Math.random() * 0.4); // Some variation
+    const distance = minDistance * (0.8 + Math.random() * 0.4);
     const offsetX = Math.cos(angle) * distance;
     const offsetY = Math.sin(angle) * distance;
     
@@ -504,32 +488,6 @@ function explodeCellIntoMany(player, cell) {
 
   player.cells = player.cells.filter((c) => c !== cell);
   player.cells.push(...newCells);
-}
-
-function preventInitialOverlap(cells) {
-  for (let i = 0; i < cells.length; i++) {
-    for (let j = i + 1; j < cells.length; j++) {
-      const a = cells[i];
-      const b = cells[j];
-      
-      const dx = a.x - b.x;
-      const dy = a.y - b.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      const minDistance = a.radius + b.radius + 5; // +5 for safety margin
-      
-      if (distance < minDistance && distance > 0) {
-        // Push cells apart
-        const overlap = minDistance - distance;
-        const pushX = (dx / distance) * overlap * 0.5;
-        const pushY = (dy / distance) * overlap * 0.5;
-        
-        a.x += pushX;
-        a.y += pushY;
-        b.x -= pushX;
-        b.y -= pushY;
-      }
-    }
-  }
 }
 
 function getLeaderboard() {
@@ -577,7 +535,7 @@ function update(dt) {
         const dy = p.mouseY - c.y;
         const distToMouse = Math.sqrt(dx * dx + dy * dy);
         
-        if (distToMouse > c.radius * 0.5) { // Stop when close enough
+        if (distToMouse > c.radius * 0.5) {
           const normX = dx / distToMouse;
           const normY = dy / distToMouse;
           
@@ -619,7 +577,7 @@ function update(dt) {
     qtFood.insert(f);
   }
 
-  // eat food - FOOD ONLY INCREASES CELL SIZE, NOT SCORE DIRECTLY
+  // eat food
   for (const p of players.values()) {
     for (const c of p.cells) {
       const range = { x: c.x, y: c.y, w: c.radius * 4, h: c.radius * 4 };
@@ -633,7 +591,6 @@ function update(dt) {
           const areaC = cellAreaFromRadius(c.radius);
           const areaF = cellAreaFromRadius(f.radius);
           c.radius = radiusFromArea(areaC + areaF);
-          // NO SCORE INCREMENT HERE - score calculated from total cell size
           f.dead = true;
         }
       }
@@ -644,7 +601,7 @@ function update(dt) {
     foods.push(createFood(false));
   }
 
-  // build quadtree for all cells (for cell-vs-cell + virus)
+  // build quadtree for all cells
   const allCells = [];
   for (const p of players.values()) {
     for (const c of p.cells) {
@@ -656,7 +613,7 @@ function update(dt) {
     qtCells.insert(pc);
   }
 
-  // cell vs cell eating - BIG CELL EATS SMALL CELL, GAINS ITS SIZE
+  // cell vs cell eating
   for (const item of allCells) {
     const pA = item.player;
     const cA = item.cell;
@@ -752,7 +709,7 @@ function broadcastState() {
       name: p.name,
       skin: p.skin,
       color: p.color,
-      score: calculateScoreFromCells(p.cells),  // Score calculated from cell size
+      score: calculateScoreFromCells(p.cells),
       cells: p.cells
     })),
     leaderboard: getLeaderboard()
@@ -766,40 +723,51 @@ function broadcastState() {
   }
 }
 
-/* ---------------- SERVER SETUP ---------------- */
+/* ---------------- SERVER SETUP WITH WSS ---------------- */
 
 initWorld();
-//spawnBots();
-
 const wss = new WebSocket.Server({ port: PORT });
-console.log("Eat Cell server listening on ws://localhost:" + PORT);
+function setupWebSocketServer(wss) {
+  wss.on("connection", (ws, req) => {    
+    const id = nextPlayerId++;
+    const player = createPlayer(id);
+    players.set(id, player);
+    clients.set(ws, id);
 
-wss.on("connection", (ws) => {
-  const id = nextPlayerId++;
-  const player = createPlayer(id);
-  players.set(id, player);
-  clients.set(ws, id);
+    ws.send(
+      JSON.stringify({
+        type: "welcome",
+        id,
+        worldSize: WORLD_SIZE
+      })
+    );
 
-  ws.send(
-    JSON.stringify({
-      type: "welcome",
-      id,
-      worldSize: WORLD_SIZE
-    })
-  );
+    ws.on("message", (data) => handleMessage(ws, data));
 
-  ws.on("message", (data) => handleMessage(ws, data));
-
-  ws.on("close", (code,reason) => {
-    clients.delete(ws);
-    players.delete(id);
+    ws.on("close", (code, reason) => {
+      clients.delete(ws);
+      players.delete(id);
+    });
+    
+    ws.on("error", (error) => {
+      console.log("⚠️ WebSocket error from " + clientIp + ": " + error.message);
+    });
   });
-});
+  
+  wss.on("error", (error) => {
+    console.error("❌ WebSocket Server error: " + error.message);
+  });
+}
 
-let lastTime = Date.now() / 1000;
-setInterval(() => {
-  const now = Date.now() / 1000;
-  const dt = now - lastTime;
-  lastTime = now;
-  update(dt);
-}, 1000 / TICK_RATE);
+function startGameLoop() {
+  let lastTime = Date.now() / 1000;
+  setInterval(() => {
+    const now = Date.now() / 1000;
+    const dt = now - lastTime;
+    lastTime = now;
+    update(dt);
+  }, 1000 / TICK_RATE);
+}
+
+setupWebSocketServer(wss);
+startGameLoop();
