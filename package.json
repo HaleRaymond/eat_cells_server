@@ -1,0 +1,21 @@
+{
+  "name": "godot-web-server",
+  "version": "1.0.0",
+  "description": "Static HTTP server for Godot web games",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "godot",
+    "web",
+    "static",
+    "server"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.18.3"
+  }
+}
