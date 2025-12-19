@@ -6,15 +6,15 @@ const WebSocket = require("ws");
 /* ---------------- CONFIG ---------------- */
 
 const PORT = process.env.PORT || 8080;
-const TICK_RATE = 10;                 // ticks per second
+const TICK_RATE = 20;                 // ticks per second
 const WORLD_SIZE = 6000;              // square world, center (0,0)
 const BASE_SPEED = 550;               // base movement speed
 const SPLIT_SPEED = 400;             // speed of split pieces
 const MERGE_TIME = 10;                // seconds before cells can merge
 const FOOD_COUNT = 120;
 const FOOD_RADIUS = 15;
-const VIRUS_COUNT = 20;
-const VIRUS_RADIUS = 90;
+const VIRUS_COUNT = 12;
+const VIRUS_RADIUS = 60;
 const MAX_VIRUS_PIECES = 16;
 const BOT_COUNT = 20;                 // how many bots to spawn
 const TARGET_SPEED_MULTIPLIER = 1.0;  // How fast cells move to target
