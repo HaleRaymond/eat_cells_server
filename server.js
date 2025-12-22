@@ -15,7 +15,7 @@ const FOOD_COUNT = 60;
 const FOOD_RADIUS = 15;
 const VIRUS_COUNT = 20;
 const VIRUS_RADIUS = 60;
-const MAX_VIRUS_PIECES = 16;
+const MAX_VIRUS_PIECES = 12;
 const BOT_COUNT = 20;                 // how many bots to spawn
 const TARGET_SPEED_MULTIPLIER = 1.0;  // How fast cells move to target
 
