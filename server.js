@@ -6,7 +6,7 @@ const WebSocket = require("ws");
 /* ---------------- CONFIG ---------------- */
 
 const PORT = process.env.PORT || 8080;  // Changed to standard HTTPS/WSS port
-const TICK_RATE = 6;                 // ticks per second
+const TICK_RATE = 20;                 // ticks per second
 const WORLD_SIZE = 6000;              // square world, center (0,0)
 const BASE_SPEED = 400;               // base movement speed
 const SPLIT_SPEED = 400;              // speed of split pieces
