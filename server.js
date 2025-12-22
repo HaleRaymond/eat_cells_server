@@ -340,15 +340,16 @@ function handleMessage(ws, raw) {
 
   switch (msg.type) {
     case "join":
-      if (typeof msg.name === "string" && msg.name.length > 0) {
-        player.name = msg.name.slice(0, 16);
-      }
       if (typeof msg.skin === "number") {
         player.skin = msg.skin;
       }
       if (typeof msg.color === "object") {
         player.color = msg.color;
       }
+      if (typeof msg.name === "string" && msg.name.length > 0) {
+        player.name = msg.name.slice(0, 16);
+      }
+
       break;
 
     case "input":
