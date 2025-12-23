@@ -17,7 +17,7 @@ const VIRUS_COUNT = 20;
 const VIRUS_RADIUS = 60;
 const MAX_VIRUS_PIECES = 12;
 const MIN_TOTAL_PLAYERS = 20;        // Minimum total players (humans + bots)
-const BOT_SIZE_SCALE = 0.1;          // Bots are 10x smaller (0.1 = 10x reduction)
+const BOT_SIZE_SCALE = 10;          // Bots are 10x smaller (0.1 = 10x reduction)
 const TARGET_SPEED_MULTIPLIER = 1.0;  // How fast cells move to target
 
 /* ---------------- STATE ---------------- */
