@@ -726,6 +726,7 @@ function broadcastState() {
 /* ---------------- SERVER SETUP WITH WSS ---------------- */
 
 initWorld();
+spawnBots();
 const wss = new WebSocket.Server({ port: PORT });
 function setupWebSocketServer(wss) {
   wss.on("connection", (ws, req) => {    
