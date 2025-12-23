@@ -16,7 +16,8 @@ const FOOD_RADIUS = 15;
 const VIRUS_COUNT = 20;
 const VIRUS_RADIUS = 60;
 const MAX_VIRUS_PIECES = 12;
-const BOT_COUNT = 20;                 // how many bots to spawn
+const MIN_TOTAL_PLAYERS = 20;        // Minimum total players (humans + bots)
+const BOT_SIZE_SCALE = 0.1;          // Bots are 10x smaller (0.1 = 10x reduction)
 const TARGET_SPEED_MULTIPLIER = 1.0;  // How fast cells move to target
 
 /* ---------------- STATE ---------------- */
@@ -236,7 +237,7 @@ function createBot(id) {
       {
         x: randPos(),
         y: randPos(),
-        radius: 40,
+        radius: 40 * BOT_SIZE_SCALE,  // Bot is 10x smaller
         vx: 0,
         vy: 0,
         mergeTimer: MERGE_TIME
@@ -248,7 +249,15 @@ function createBot(id) {
 }
 
 function spawnBots() {
-  for (let i = 0; i < BOT_COUNT; i++) {
+  // Count current players
+  const humanPlayers = Array.from(players.values()).filter(p => !p.isBot).length;
+  const currentBots = Array.from(players.values()).filter(p => p.isBot).length;
+  const totalPlayers = humanPlayers + currentBots;
+  
+  // Calculate how many bots we need to reach MIN_TOTAL_PLAYERS
+  const botsNeeded = Math.max(0, MIN_TOTAL_PLAYERS - totalPlayers);
+  
+  for (let i = 0; i < botsNeeded; i++) {
     const id = nextBotId++;
     const bot = createBot(id);
     players.set(id, bot);
@@ -263,7 +272,7 @@ function botThink(bot) {
   let target = null;
   let flee = null;
 
-  // nearest food
+  // Find nearest food or smaller player
   for (const f of foods) {
     const dx = f.x - my.x;
     const dy = f.y - my.y;
@@ -273,20 +282,24 @@ function botThink(bot) {
     }
   }
 
-  // other players
+  // Look for smaller players to eat
   for (const p of players.values()) {
     if (p === bot) continue;
     for (const c of p.cells) {
       const dx = c.x - my.x;
       const dy = c.y - my.y;
       const dist2 = dx * dx + dy * dy;
-      if (c.radius > my.radius * 1.2) {
-        if (!flee || dist2 < flee.dist2) {
-          flee = { x: c.x, y: c.y, dist2 };
-        }
-      } else if (c.radius < my.radius * 0.8) {
+      
+      // If player is smaller, target it
+      if (c.radius < my.radius * 0.8) {  // 20% smaller
         if (!target || dist2 < target.dist2) {
           target = { x: c.x, y: c.y, dist2 };
+        }
+      }
+      // If player is bigger, flee from it
+      else if (c.radius > my.radius * 1.2) {  // 20% bigger
+        if (!flee || dist2 < flee.dist2) {
+          flee = { x: c.x, y: c.y, dist2 };
         }
       }
     }
@@ -303,10 +316,35 @@ function botThink(bot) {
 
   const len = Math.hypot(vx, vy) || 1;
   bot.inputDir = [vx / len, vy / len];
+}
 
-  // occasional split when chasing
-  if (target && Math.random() < 0.01) {
-    splitPlayer(bot);
+/* ---------------- BOT MANAGEMENT ---------------- */
+
+function checkAndRespawnBots() {
+  // Count current players
+  const humanPlayers = Array.from(players.values()).filter(p => !p.isBot).length;
+  const currentBots = Array.from(players.values()).filter(p => p.isBot).length;
+  const totalPlayers = humanPlayers + currentBots;
+  
+  // If we have 20 or more human players, don't spawn bots
+  if (humanPlayers >= MIN_TOTAL_PLAYERS) {
+    // Remove all existing bots
+    for (const [id, player] of players.entries()) {
+      if (player.isBot) {
+        players.delete(id);
+      }
+    }
+    return;
+  }
+  
+  // Calculate how many bots we need
+  const botsNeeded = MIN_TOTAL_PLAYERS - totalPlayers;
+  
+  // Spawn new bots if needed
+  for (let i = 0; i < botsNeeded; i++) {
+    const id = nextBotId++;
+    const bot = createBot(id);
+    players.set(id, bot);
   }
 }
 
@@ -696,6 +734,9 @@ function update(dt) {
     }
   }
 
+  // Check and respawn bots to maintain minimum player count
+  checkAndRespawnBots();
+
   broadcastState();
 }
 
@@ -726,7 +767,6 @@ function broadcastState() {
 /* ---------------- SERVER SETUP WITH WSS ---------------- */
 
 initWorld();
-spawnBots();
 const wss = new WebSocket.Server({ port: PORT });
 function setupWebSocketServer(wss) {
   wss.on("connection", (ws, req) => {    
@@ -734,6 +774,9 @@ function setupWebSocketServer(wss) {
     const player = createPlayer(id);
     players.set(id, player);
     clients.set(ws, id);
+
+    // Spawn bots after a player joins to maintain minimum count
+    checkAndRespawnBots();
 
     ws.send(
       JSON.stringify({
@@ -748,10 +791,12 @@ function setupWebSocketServer(wss) {
     ws.on("close", (code, reason) => {
       clients.delete(ws);
       players.delete(id);
+      // Check if we need to spawn more bots after player leaves
+      checkAndRespawnBots();
     });
     
     ws.on("error", (error) => {
-      console.log("⚠️ WebSocket error from " + clientIp + ": " + error.message);
+      console.log("⚠️ WebSocket error: " + error.message);
     });
   });
   
@@ -772,3 +817,6 @@ function startGameLoop() {
 
 setupWebSocketServer(wss);
 startGameLoop();
+
+console.log(`Server running on port ${PORT}`);
+console.log(`Maintaining minimum of ${MIN_TOTAL_PLAYERS} total players`);
