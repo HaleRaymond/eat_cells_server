@@ -1,4 +1,4 @@
-// Eat Cell / Agar.io-style multiplayer server
+12/ Eat Cell / Agar.io-style multiplayer server
 // Node.js + ws with HTTPS/WSS support
 
 const WebSocket = require("ws");
@@ -16,7 +16,7 @@ const FOOD_RADIUS = 15;
 const VIRUS_COUNT = 20;
 const VIRUS_RADIUS = 60;
 const MAX_VIRUS_PIECES = 12;
-const MIN_TOTAL_PLAYERS = 20;        // Minimum total players (humans + bots)
+const MIN_TOTAL_PLAYERS = 12;        // Minimum total players (humans + bots)
 const TARGET_SPEED_MULTIPLIER = 1.0;  // How fast cells move to target
 
 /* ---------------- STATE ---------------- */
