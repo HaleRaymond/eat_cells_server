@@ -1,4 +1,4 @@
-12/ Eat Cell / Agar.io-style multiplayer server
+// Eat Cell / Agar.io-style multiplayer server
 // Node.js + ws with HTTPS/WSS support
 
 const WebSocket = require("ws");
@@ -226,6 +226,25 @@ function createPlayer(id, skin = -1) {
 }
 
 function createBot(id) {
+  // Create a balanced size distribution for bots
+  // 30% small bots (40-80), 40% medium bots (80-150), 20% large bots (150-250), 10% very large bots (250-400)
+  const sizeRand = Math.random();
+  let botRadius;
+  
+  if (sizeRand < 0.3) {
+    // Small bots: 30% of bots
+    botRadius = 40 + Math.random() * 40; // 40-80
+  } else if (sizeRand < 0.7) {
+    // Medium bots: 40% of bots
+    botRadius = 80 + Math.random() * 70; // 80-150
+  } else if (sizeRand < 0.9) {
+    // Large bots: 20% of bots
+    botRadius = 150 + Math.random() * 100; // 150-250
+  } else {
+    // Very large bots: 10% of bots
+    botRadius = 250 + Math.random() * 150; // 250-400
+  }
+  
   return {
     id,
     name: "Bot_" + id,
@@ -236,7 +255,7 @@ function createBot(id) {
       {
         x: randPos(),
         y: randPos(),
-        radius: 40,  // Removed scale - bots are normal size
+        radius: botRadius,
         vx: 0,
         vy: 0,
         mergeTimer: MERGE_TIME
@@ -330,7 +349,8 @@ function botThink(bot) {
   }
 
   // Decision making: Safety first!
-  const DANGER_DISTANCE = 100; // Distance at which we start to worry about big players
+  // DANGER_DISTANCE scales with cell size - larger cells need more space to maneuver
+  const DANGER_DISTANCE = 150 + myCell.radius * 0.5; 
   
   if (nearestBigPlayer && nearestBigPlayer.dist2 < DANGER_DISTANCE * DANGER_DISTANCE) {
     // There's a big player nearby - FLEE!
@@ -371,11 +391,27 @@ function checkAndRespawnBots() {
   const currentBots = Array.from(players.values()).filter(p => p.isBot).length;
   const totalPlayers = humanPlayers + currentBots;
   
-  // If we have 20 or more human players, don't spawn bots
-  if (humanPlayers >= MIN_TOTAL_PLAYERS) {
-    // Remove all existing bots
-    for (const [id, player] of players.entries()) {
-      if (player.isBot) {
+  // If we have enough human players, remove some bots but keep a minimum
+  const MIN_BOTS = 3; // Always keep at least 3 bots for lively gameplay
+  if (humanPlayers >= MIN_TOTAL_PLAYERS - MIN_BOTS) {
+    // Calculate how many bots to remove
+    const botsToKeep = Math.max(MIN_BOTS, MIN_TOTAL_PLAYERS - humanPlayers);
+    const currentBotCount = Array.from(players.values()).filter(p => p.isBot).length;
+    
+    if (currentBotCount > botsToKeep) {
+      // Remove excess bots (remove the smallest ones first)
+      const botEntries = Array.from(players.entries()).filter(([id, p]) => p.isBot);
+      
+      // Sort bots by size (ascending - smallest first)
+      botEntries.sort((a, b) => {
+        const sizeA = a[1].cells[0]?.radius || 0;
+        const sizeB = b[1].cells[0]?.radius || 0;
+        return sizeA - sizeB;
+      });
+      
+      // Remove the smallest bots
+      const botsToRemove = botEntries.slice(0, currentBotCount - botsToKeep);
+      for (const [id, bot] of botsToRemove) {
         players.delete(id);
       }
     }
