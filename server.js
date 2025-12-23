@@ -17,7 +17,6 @@ const VIRUS_COUNT = 20;
 const VIRUS_RADIUS = 60;
 const MAX_VIRUS_PIECES = 12;
 const MIN_TOTAL_PLAYERS = 20;        // Minimum total players (humans + bots)
-const BOT_SIZE_SCALE = 1;          // Bots are 10x smaller (0.1 = 10x reduction)
 const TARGET_SPEED_MULTIPLIER = 1.0;  // How fast cells move to target
 
 /* ---------------- STATE ---------------- */
@@ -237,13 +236,15 @@ function createBot(id) {
       {
         x: randPos(),
         y: randPos(),
-        radius: 40 * BOT_SIZE_SCALE,  // Bot is 10x smaller
+        radius: 40,  // Removed scale - bots are normal size
         vx: 0,
         vy: 0,
         mergeTimer: MERGE_TIME
       }
     ],
     inputDir: [0, 0],
+    target: null,
+    fleeFrom: null,
     // No score property - score will be calculated dynamically from cell size
   };
 }
@@ -268,54 +269,98 @@ function spawnBots() {
 
 function botThink(bot) {
   if (!bot.cells.length) return;
-  const my = bot.cells[0];
-  let target = null;
-  let flee = null;
+  const myCell = bot.cells[0];
+  
+  let nearestSmallPlayer = null;
+  let nearestBigPlayer = null;
+  let nearestFood = null;
 
-  // Find nearest food or smaller player
-  for (const f of foods) {
-    const dx = f.x - my.x;
-    const dy = f.y - my.y;
-    const dist2 = dx * dx + dy * dy;
-    if (!target || dist2 < target.dist2) {
-      target = { x: f.x, y: f.y, dist2 };
-    }
-  }
+  // Reset targets
+  bot.target = null;
+  bot.fleeFrom = null;
 
-  // Look for smaller players to eat
+  // Check all players (including other bots and humans)
   for (const p of players.values()) {
     if (p === bot) continue;
-    for (const c of p.cells) {
-      const dx = c.x - my.x;
-      const dy = c.y - my.y;
+    
+    for (const cell of p.cells) {
+      const dx = cell.x - myCell.x;
+      const dy = cell.y - myCell.y;
       const dist2 = dx * dx + dy * dy;
       
-      // If player is smaller, target it
-      if (c.radius < my.radius * 0.8) {  // 20% smaller
-        if (!target || dist2 < target.dist2) {
-          target = { x: c.x, y: c.y, dist2 };
+      // Check if this player is smaller and can be eaten
+      if (cell.radius < myCell.radius * 0.8) {  // 20% smaller
+        if (!nearestSmallPlayer || dist2 < nearestSmallPlayer.dist2) {
+          nearestSmallPlayer = {
+            x: cell.x,
+            y: cell.y,
+            dist2: dist2,
+            radius: cell.radius
+          };
         }
       }
-      // If player is bigger, flee from it
-      else if (c.radius > my.radius * 1.2) {  // 20% bigger
-        if (!flee || dist2 < flee.dist2) {
-          flee = { x: c.x, y: c.y, dist2 };
+      
+      // Check if this player is bigger and can eat us
+      if (cell.radius > myCell.radius * 1.2) {  // 20% bigger
+        if (!nearestBigPlayer || dist2 < nearestBigPlayer.dist2) {
+          nearestBigPlayer = {
+            x: cell.x,
+            y: cell.y,
+            dist2: dist2,
+            radius: cell.radius
+          };
         }
       }
     }
   }
 
-  let vx = 0, vy = 0;
-  if (flee) {
-    vx = my.x - flee.x;
-    vy = my.y - flee.y;
-  } else if (target) {
-    vx = target.x - my.x;
-    vy = target.y - my.y;
+  // Find nearest food
+  for (const f of foods) {
+    const dx = f.x - myCell.x;
+    const dy = f.y - myCell.y;
+    const dist2 = dx * dx + dy * dy;
+    
+    if (!nearestFood || dist2 < nearestFood.dist2) {
+      nearestFood = {
+        x: f.x,
+        y: f.y,
+        dist2: dist2
+      };
+    }
   }
 
-  const len = Math.hypot(vx, vy) || 1;
-  bot.inputDir = [vx / len, vy / len];
+  // Decision making: Safety first!
+  const DANGER_DISTANCE = 100; // Distance at which we start to worry about big players
+  
+  if (nearestBigPlayer && nearestBigPlayer.dist2 < DANGER_DISTANCE * DANGER_DISTANCE) {
+    // There's a big player nearby - FLEE!
+    bot.fleeFrom = nearestBigPlayer;
+    const dx = myCell.x - nearestBigPlayer.x;
+    const dy = myCell.y - nearestBigPlayer.y;
+    const len = Math.hypot(dx, dy) || 1;
+    bot.inputDir = [dx / len, dy / len];
+  } else if (nearestSmallPlayer) {
+    // There's a smaller player we can eat - CHASE!
+    bot.target = nearestSmallPlayer;
+    const dx = nearestSmallPlayer.x - myCell.x;
+    const dy = nearestSmallPlayer.y - myCell.y;
+    const len = Math.hypot(dx, dy) || 1;
+    bot.inputDir = [dx / len, dy / len];
+  } else if (nearestFood) {
+    // No threats or targets, just eat food
+    bot.target = nearestFood;
+    const dx = nearestFood.x - myCell.x;
+    const dy = nearestFood.y - myCell.y;
+    const len = Math.hypot(dx, dy) || 1;
+    bot.inputDir = [dx / len, dy / len];
+  } else {
+    // Nothing to do, move randomly
+    if (Math.random() < 0.02) {
+      bot.inputDir = [Math.random() * 2 - 1, Math.random() * 2 - 1];
+      const len = Math.hypot(bot.inputDir[0], bot.inputDir[1]) || 1;
+      bot.inputDir = [bot.inputDir[0] / len, bot.inputDir[1] / len];
+    }
+  }
 }
 
 /* ---------------- BOT MANAGEMENT ---------------- */
